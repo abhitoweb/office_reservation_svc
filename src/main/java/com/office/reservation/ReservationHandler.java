@@ -39,7 +39,7 @@ public class ReservationHandler {
         }
 
     }
-    private static Reservation getReservation(String[] row) {
+    public static Reservation getReservation(String[] row) {
         Reservation rData = new Reservation();
         rData.setCapacity(Integer.parseInt(row[0].trim()));
         rData.setMonthlyPrice(Double.parseDouble(row[1].trim()));
