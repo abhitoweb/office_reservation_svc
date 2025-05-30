@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Office Reservation</title>
+</head>
+<body>
+<h2>Monthly Reservation Metric</h2>
+
+<label for="monthYear">Year-Month: </label>
+<input type="text" id="monthYear" placeholder="yyyy-MM">
+
+<button onclick="fetchUnreservedCapacity()">Get Unreserved Capacity</button>
+<button onclick="fetchRevenue()">Get Revenue</button>
+
+<div id="response"></div>
+
+<script>
+    function fetchUnreservedCapacity() {
+        const monthYear = document.getElementById("monthYear").value;
+        document.getElementById("response").innerHTML = ""; // Clear previous results
+        fetch(`/reservation/unreservedCapacity?month=${monthYear}`)
+            .then(async response => {
+                if (!response.ok) {
+                    const errorBody = await response.text();
+                    throw new Error(errorBody);
+                }
+                return response.json();
+            })
+            .then(data => {
+                const capacity = data.unreservedCapacity !== undefined ? data.unreservedCapacity : 0;
+                document.getElementById("response").innerHTML =
+                    `<p><strong>Month:</strong> ${data.month}</p>
+                     <p><strong>Unreserved Capacity:</strong> ${capacity}</p>`;
+            })
+            .catch(error => {
+                document.getElementById("response").innerHTML =
+                    `<p style="color:red;">Error: ${error.message}</p>`;
+            });
+    }
+
+    function fetchRevenue() {
+        const monthYear = document.getElementById("monthYear").value;
+        document.getElementById("response").innerHTML = ""; // Clear previous results
+        fetch(`/reservation/revenue?month=${monthYear}`)
+            .then(async response => {
+                if (!response.ok) {
+                    const errorBody = await response.text();
+                    throw new Error(errorBody);
+                }
+                return response.json();
+            })
+            .then(data => {
+                const revenue = data.revenue !== undefined ? data.revenue : 0;
+                document.getElementById("response").innerHTML =
+                    `<p><strong>Month:</strong> ${data.month}</p>
+                     <p><strong>Revenue:</strong> ${revenue}</p>`;
+            })
+            .catch(error => {
+                document.getElementById("response").innerHTML =
+                    `<p style="color:red;">Error: ${error.message}</p>`;
+            });
+    }
+</script>
+</body>
+</html>
