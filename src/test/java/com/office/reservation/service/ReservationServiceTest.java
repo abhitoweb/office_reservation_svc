@@ -5,12 +5,16 @@ import com.office.reservation.helper.ReservationHelper;
 import com.office.reservation.model.Response;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
+import org.mockito.junit.jupiter.MockitoExtension;
+
 import java.time.YearMonth;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class ReservationServiceTest {
 
     @InjectMocks
@@ -20,60 +24,47 @@ class ReservationServiceTest {
     private ReservationHelper reservationHelper;
 
     @Mock
-    private IBusinessLogic businessLogic;
+    private IBusinessLogic businessLogicImpl;
 
-    private final String validMonthYear = "2025-06";
-    private final YearMonth parsedYearMonth = YearMonth.of(2025, 6);
+    private final String input = "2014-05";
+
+    private final YearMonth parsedMonth = YearMonth.of(2014, 5);
+
+    private final Response mockResponse = Response.builder()
+            .month("2014-05")
+            .revenue(5000)
+            .unreservedCapacity(10)
+            .build();
 
     @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
+    void setup() throws Exception {
+        lenient().when(reservationHelper.parseMonthYear(input)).thenReturn(parsedMonth);
+        lenient().when(businessLogicImpl.fetchReservationData(parsedMonth)).thenReturn(mockResponse);
     }
 
     @Test
-    void testFetchData_Revenue() throws Exception {
-        when(reservationHelper.parseMonthYear(validMonthYear)).thenReturn(parsedYearMonth);
-        doNothing().when(businessLogic).loadReservationsIfChanged();
-        when(businessLogic.calculateRevenue(parsedYearMonth)).thenReturn(1234.56);
-
-        Response response = reservationService.fetchData(validMonthYear, "revenue");
+    void testFetchData_success() throws Exception {
+        Response response = reservationService.fetchData(input);
 
         assertNotNull(response);
-        assertEquals("2025-06", response.getMonth());
-        assertEquals(1235, response.getRevenue()); // Rounded from 1234.56
-        assertEquals(0, response.getUnreservedCapacity()); // default value
-    }
-
-    @Test
-    void testFetchData_UnreservedCapacity() throws Exception {
-        when(reservationHelper.parseMonthYear(validMonthYear)).thenReturn(parsedYearMonth);
-        doNothing().when(businessLogic).loadReservationsIfChanged();
-        when(businessLogic.calculateUnreservedCapacity(parsedYearMonth)).thenReturn(10);
-
-        Response response = reservationService.fetchData(validMonthYear, "unreservedCapacity");
-
-        assertNotNull(response);
-        assertEquals("2025-06", response.getMonth());
+        assertEquals("2014-05", response.getMonth());
+        assertEquals(5000, response.getRevenue());
         assertEquals(10, response.getUnreservedCapacity());
-        assertEquals(0, response.getRevenue()); // default value
+
+        verify(reservationHelper).parseMonthYear(input);
+        verify(businessLogicImpl).loadReservationsIfChanged();
+        verify(businessLogicImpl).fetchReservationData(parsedMonth);
     }
 
     @Test
-    void testFetchData_InvalidTask_ReturnsNull() throws Exception {
-        when(reservationHelper.parseMonthYear(validMonthYear)).thenReturn(parsedYearMonth);
-        doNothing().when(businessLogic).loadReservationsIfChanged();
+    void testFetchData_exceptionFromBusinessLogic() throws Exception {
+        doThrow(new RuntimeException("Load failed")).when(businessLogicImpl).loadReservationsIfChanged();
 
-        Response response = reservationService.fetchData(validMonthYear, "invalidTask");
+        Exception exception = assertThrows(RuntimeException.class, () -> reservationService.fetchData(input));
+        assertEquals("Load failed", exception.getMessage());
 
-        assertNull(response); // switch block falls through with no match
-    }
-
-    @Test
-    void testFetchData_ThrowsExceptionFromHelper() throws Exception {
-        when(reservationHelper.parseMonthYear(validMonthYear)).thenThrow(new IllegalArgumentException("Invalid format"));
-
-        assertThrows(IllegalArgumentException.class, () ->
-                reservationService.fetchData(validMonthYear, "revenue")
-        );
+        verify(reservationHelper).parseMonthYear(input);
+        verify(businessLogicImpl).loadReservationsIfChanged();
+        verify(businessLogicImpl, never()).fetchReservationData(any());
     }
 }

@@ -2,89 +2,60 @@ package com.office.reservation.controller;
 
 import com.office.reservation.model.Response;
 import com.office.reservation.service.ReservationService;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
 
+@ExtendWith(MockitoExtension.class)
 class ReservationSvcControllerTest {
 
     @Mock
-    private ReservationService service;
+    private ReservationService reservationService;
 
     @InjectMocks
     private ReservationSvcController controller;
 
-    @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
-    }
-
     @Test
-    void testCalculateRevenue_Success() throws Exception {
+    void testCalculateRevenue_success() throws Exception {
         // Arrange
-        String month = "2025-05";
-        Response mockResponse =  Response.builder().build();
-        mockResponse.setMonth(month);
-        mockResponse.setRevenue(12345);
+        String inputMonth = "2014-05";
+        Response mockResponse = Response.builder()
+                .month("2014-05")
+                .revenue(6000)
+                .unreservedCapacity(8)
+                .build();
 
-        when(service.fetchData(month, "revenue")).thenReturn(mockResponse);
+        when(reservationService.fetchData(inputMonth)).thenReturn(mockResponse);
 
         // Act
-        Response response = controller.calculateRevenue(month);
+        Response response = controller.calculateRevenue(inputMonth);
 
         // Assert
         assertNotNull(response);
-        assertEquals(month, response.getMonth());
-        assertEquals(12345, response.getRevenue());
-        verify(service).fetchData(month, "revenue");
+        assertEquals("2014-05", response.getMonth());
+        assertEquals(6000, response.getRevenue());
+        assertEquals(8, response.getUnreservedCapacity());
+
+        verify(reservationService, times(1)).fetchData(inputMonth);
     }
 
     @Test
-    void testCalculateUnreservedCapacity_Success() throws Exception {
+    void testCalculateRevenue_exceptionThrown() throws Exception {
         // Arrange
-        String month = "2025-05";
-        Response mockResponse = Response.builder().build();
-        mockResponse.setMonth(month);
-        mockResponse.setUnreservedCapacity(42);
+        String inputMonth = "2014-05";
+        when(reservationService.fetchData(inputMonth)).thenThrow(new RuntimeException("Service failure"));
 
-        when(service.fetchData(month, "unreservedCapacity")).thenReturn(mockResponse);
-
-        // Act
-        Response result = controller.calculateUnreservedCapacity(month);
-
-        // Assert
-        assertNotNull(result);
-        assertEquals(month, result.getMonth());
-        assertEquals(42, result.getUnreservedCapacity());
-        verify(service).fetchData(month, "unreservedCapacity");
-    }
-
-    @Test
-    void testCalculateRevenue_Exception() throws Exception {
-        String month = "2025-05";
-        when(service.fetchData(month, "revenue")).thenThrow(new RuntimeException("Something went wrong"));
-
+        // Act & Assert
         Exception exception = assertThrows(RuntimeException.class, () -> {
-            controller.calculateRevenue(month);
-        });
-
-        assertEquals("Something went wrong", exception.getMessage());
-    }
-
-    @Test
-    void testCalculateUnreservedCapacity_Exception() throws Exception {
-        String month = "2025-05";
-        when(service.fetchData(month, "unreservedCapacity")).thenThrow(new RuntimeException("Service failure"));
-
-        Exception exception = assertThrows(RuntimeException.class, () -> {
-            controller.calculateUnreservedCapacity(month);
+            controller.calculateRevenue(inputMonth);
         });
 
         assertEquals("Service failure", exception.getMessage());
+        verify(reservationService, times(1)).fetchData(inputMonth);
     }
 }

@@ -2,65 +2,59 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Office Reservation</title>
+    <title>Office Reservation Metric</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        #response {
+            margin-top: 20px;
+        }
+        .highlight {
+            font-weight: bold;
+            color: black;
+        }
+    </style>
 </head>
 <body>
+
 <h2>Monthly Reservation Metric</h2>
 
-<label for="monthYear">Year-Month: </label>
+<label for="monthYear">Year-Month:</label>
 <input type="text" id="monthYear" placeholder="yyyy-MM">
-
-<button onclick="fetchUnreservedCapacity()">Get Unreserved Capacity</button>
-<button onclick="fetchRevenue()">Get Revenue</button>
+<button onclick="fetchMetric()">Get Data</button>
 
 <div id="response"></div>
 
 <script>
-    function fetchUnreservedCapacity() {
-        const monthYear = document.getElementById("monthYear").value;
-        document.getElementById("response").innerHTML = ""; // Clear previous results
-        fetch(`/reservation/unreservedCapacity?month=${monthYear}`)
-            .then(async response => {
-                if (!response.ok) {
-                    const errorBody = await response.text();
-                    throw new Error(errorBody);
-                }
-                return response.json();
-            })
-            .then(data => {
-                const capacity = data.unreservedCapacity !== undefined ? data.unreservedCapacity : 0;
-                document.getElementById("response").innerHTML =
-                    `<p><strong>Month:</strong> ${data.month}</p>
-                     <p><strong>Unreserved Capacity:</strong> ${capacity}</p>`;
-            })
-            .catch(error => {
-                document.getElementById("response").innerHTML =
-                    `<p style="color:red;">Error: ${error.message}</p>`;
-            });
-    }
+    async function fetchMetric() {
+        const monthYear = document.getElementById("monthYear").value.trim();
+        const outputDiv = document.getElementById("response");
+        outputDiv.innerHTML = ""; // Clear previous result
 
-    function fetchRevenue() {
-        const monthYear = document.getElementById("monthYear").value;
-        document.getElementById("response").innerHTML = ""; // Clear previous results
-        fetch(`/reservation/revenue?month=${monthYear}`)
-            .then(async response => {
-                if (!response.ok) {
-                    const errorBody = await response.text();
-                    throw new Error(errorBody);
-                }
-                return response.json();
-            })
-            .then(data => {
-                const revenue = data.revenue !== undefined ? data.revenue : 0;
-                document.getElementById("response").innerHTML =
-                    `<p><strong>Month:</strong> ${data.month}</p>
-                     <p><strong>Revenue:</strong> ${revenue}</p>`;
-            })
-            .catch(error => {
-                document.getElementById("response").innerHTML =
-                    `<p style="color:red;">Error: ${error.message}</p>`;
-            });
+        if (!monthYear) {
+            outputDiv.innerHTML = "<p style='color:red;'>Please enter a valid month (yyyy-MM)</p>";
+            return;
+        }
+
+        try {
+            const response = await fetch(`/reservation/metrics?month=${monthYear}`);
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText);
+            }
+
+            const data = await response.json();
+            const revenue = data.revenue !== undefined ? `$${Number(data.revenue).toLocaleString()}` : "$0";
+            const capacity = data.unreservedCapacity !== undefined ? data.unreservedCapacity : 0;
+
+            outputDiv.innerHTML = `* ${monthYear}: expected revenue: <span class="highlight">${revenue}</span>, expected total capacity of the unreserved offices: <span class="highlight">${capacity}</span>`;
+        } catch (error) {
+            outputDiv.innerHTML = `<p style="color:red;">Error: ${error.message}</p>`;
+        }
     }
 </script>
+
 </body>
 </html>

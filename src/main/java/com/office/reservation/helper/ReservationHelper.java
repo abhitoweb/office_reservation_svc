@@ -48,7 +48,7 @@ public class ReservationHelper {
     }
 
     private Reservation getReservation(String[] row) {
-        Reservation rData = new Reservation();
+        Reservation rData = Reservation.builder().build();
         rData.setCapacity(Integer.parseInt(row[0].trim()));
         rData.setMonthlyPrice(Double.parseDouble(row[1].trim()));
         rData.setStartDate(LocalDate.parse(row[2].trim()));
