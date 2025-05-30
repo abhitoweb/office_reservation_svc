@@ -1,0 +1,4 @@
+com/office/reservation/controller/ReservationSvcControllerTest.class
+com/office/reservation/service/ReservationServiceTest.class
+com/office/reservation/helper/ReservationHelperTest.class
+com/office/reservation/business/BusinessLogicImpTest.class
