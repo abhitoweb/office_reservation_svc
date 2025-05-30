@@ -9,9 +9,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.YearMonth;
 
-import static com.office.reservation.constant.ReservationConstant.REVENUE;
-import static com.office.reservation.constant.ReservationConstant.UNRESERVED_CAPACITY;
-
 @Slf4j
 @Service
 public class ReservationService {
@@ -22,23 +19,10 @@ public class ReservationService {
     @Autowired
     IBusinessLogic businessLogicImpl;
 
-    public Response fetchData(String monthYear, String task) throws Exception {
+    public Response fetchData(String monthYear) throws Exception {
         YearMonth yearMonth = reservationHelper.parseMonthYear(monthYear);
         businessLogicImpl.loadReservationsIfChanged();
-        Response response = null;
-        switch(task) {
-            case REVENUE:{
-                double revenue = businessLogicImpl.calculateRevenue(yearMonth);
-                response = Response.builder().month(yearMonth.toString()).revenue(Math.round(revenue)) .build();
-                            break;
-            }
-            case UNRESERVED_CAPACITY: {
-                int unreservedCapacity = businessLogicImpl.calculateUnreservedCapacity(yearMonth);
-                response = Response.builder().month(yearMonth.toString()).unreservedCapacity(unreservedCapacity).build();
-                break;
-            }
-        }
-        return response;
+        return businessLogicImpl.fetchReservationData(yearMonth);
     }
 }
 

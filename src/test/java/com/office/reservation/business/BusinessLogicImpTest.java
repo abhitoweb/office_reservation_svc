@@ -4,9 +4,12 @@ import com.office.reservation.config.ReservationConfig;
 import com.office.reservation.exception.ReservationException;
 import com.office.reservation.helper.ReservationHelper;
 import com.office.reservation.model.Reservation;
+import com.office.reservation.model.Response;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -16,111 +19,89 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-class BusinessLogicImpTest {
+@ExtendWith(MockitoExtension.class)
+public class BusinessLogicImpTest {
 
     @InjectMocks
-    private BusinessLogicImp businessLogicImp;
-
-    @Mock
-    private ReservationConfig reservationConfig;
+    private BusinessLogicImp businessLogic;
 
     @Mock
     private ReservationHelper reservationHelper;
 
-    private static final String CSV_PATH = "test.csv";
+    @Mock
+    private ReservationConfig reservationConfig;
 
-    private Reservation res1, res2;
+    private static final String FILE_PATH = "mock-data.csv";
 
     @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
-
-        // Sample reservations
-        res1 = new Reservation();
-        res1.setCapacity(5);
-        res1.setMonthlyPrice(1000);
-        res1.setStartDate(LocalDate.of(2025, 5, 1));
-        res1.setEndDate(LocalDate.of(2025, 5, 31));
-
-        res2 = new Reservation();
-        res2.setCapacity(3);
-        res2.setMonthlyPrice(1500);
-        res2.setStartDate(LocalDate.of(2025, 4, 20));
-        res2.setEndDate(LocalDate.of(2025, 5, 10));
-
-        // Inject static list
-        BusinessLogicImp.reservations = Arrays.asList(res1, res2);
-    }
-
-    @Test
-    void testCalculateRevenue_Success() throws ReservationException {
-        YearMonth ym = YearMonth.of(2025, 5);
-        double revenue = businessLogicImp.calculateRevenue(ym);
-
-        // Expected revenue:
-        // res1: full month (1000)
-        // res2: 10/31 days of 1500 = approx 483.87
-        assertEquals(1000 + (1500.0 * 10 / 31), revenue, 0.01);
-    }
-
-    @Test
-    void testCalculateRevenue_EmptyReservations() throws ReservationException {
-        BusinessLogicImp.reservations = List.of();
-        double revenue = businessLogicImp.calculateRevenue(YearMonth.of(2025, 5));
-        assertEquals(0.0, revenue);
-    }
-
-    @Test
-    void testCalculateUnreservedCapacity() throws ReservationException {
-        YearMonth ym = YearMonth.of(2025, 6); // No overlap
-        int capacity = businessLogicImp.calculateUnreservedCapacity(ym);
-
-        // Both reservations are outside June, so total unreserved capacity = 5 + 3
-        assertEquals(8, capacity);
-    }
-
-    @Test
-    void testLoadReservationsIfChanged_InitialLoad() throws Exception {
-        byte[] checksum = new byte[]{1, 2, 3};
-
-        when(reservationConfig.getReservationFilePath()).thenReturn(CSV_PATH);
-        when(reservationHelper.computeChecksumFromClasspath(CSV_PATH)).thenReturn(checksum);
-        when(reservationHelper.fetchCSVData(CSV_PATH)).thenReturn(List.of(res1, res2));
-
+    void setup() {
         BusinessLogicImp.storedByteStream = null;
-
-        businessLogicImp.loadReservationsIfChanged();
-
-        verify(reservationHelper).fetchCSVData(CSV_PATH);
-        assertEquals(checksum, BusinessLogicImp.storedByteStream);
     }
 
     @Test
-    void testLoadReservationsIfChanged_SkipWhenChecksumSame() throws Exception {
+    void testFetchReservationData_success() throws Exception {
+        // Set static reservations
+        Reservation res1 = new Reservation(2, 1500, LocalDate.of(2012, 6, 1), LocalDate.of(2015, 7, 15));
+        Reservation res2 = new Reservation(2, 1300, LocalDate.of(2012, 10, 1), null);
+        Reservation res3 = new Reservation(4, 2600, LocalDate.of(2012, 6, 1), LocalDate.of(2014, 5, 31));
+        Reservation res4 = new Reservation(4, 2700, LocalDate.of(2012, 7, 1), LocalDate.of(2014, 4, 30));
+
+        BusinessLogicImp.reservations = Arrays.asList(res1, res2, res3, res4);
+
+        YearMonth targetMonth = YearMonth.of(2013, 1);
+        Response response = businessLogic.fetchReservationData(targetMonth);
+
+        assertEquals("2013-01", response.getMonth());
+        assertEquals(8100, response.getRevenue()); // 1500+1300+2600+2700
+        assertEquals(0, response.getUnreservedCapacity());
+    }
+
+    @Test
+    void testFetchReservationData_unreservedCapacity() throws Exception {
+        Reservation res1 = new Reservation(2, 1000, LocalDate.of(2013, 2, 1), LocalDate.of(2013, 2, 28)); // starts after Jan
+        BusinessLogicImp.reservations = List.of(res1);
+
+        YearMonth targetMonth = YearMonth.of(2013, 1);
+        Response response = businessLogic.fetchReservationData(targetMonth);
+
+        assertEquals(0, response.getRevenue());
+        assertEquals(2, response.getUnreservedCapacity());
+    }
+
+    @Test
+    void testFetchReservationData_exception() {
+        BusinessLogicImp.reservations = null; // null will cause exception
+
+        YearMonth targetMonth = YearMonth.of(2013, 1);
+        assertThrows(ReservationException.class, () -> businessLogic.fetchReservationData(targetMonth));
+    }
+
+    @Test
+    void testLoadReservationsIfChanged_shouldLoad() throws Exception {
+        byte[] checksum = new byte[]{1, 2, 3};
+        List<Reservation> mockData = List.of(new Reservation(1, 1000, LocalDate.now(), null));
+
+        when(reservationConfig.getReservationFilePath()).thenReturn(FILE_PATH);
+        when(reservationHelper.computeChecksumFromClasspath(FILE_PATH)).thenReturn(checksum);
+        when(reservationHelper.fetchCSVData(FILE_PATH)).thenReturn(mockData);
+
+        businessLogic.loadReservationsIfChanged();
+
+        verify(reservationHelper, times(1)).fetchCSVData(FILE_PATH);
+        assertArrayEquals(checksum, BusinessLogicImp.storedByteStream);
+        assertEquals(mockData, BusinessLogicImp.reservations);
+    }
+
+    @Test
+    void testLoadReservationsIfChanged_shouldNotLoad() throws Exception {
         byte[] checksum = new byte[]{1, 2, 3};
         BusinessLogicImp.storedByteStream = new byte[]{1, 2, 3};
 
-        when(reservationConfig.getReservationFilePath()).thenReturn(CSV_PATH);
-        when(reservationHelper.computeChecksumFromClasspath(CSV_PATH)).thenReturn(checksum);
+        when(reservationConfig.getReservationFilePath()).thenReturn(FILE_PATH);
+        when(reservationHelper.computeChecksumFromClasspath(FILE_PATH)).thenReturn(checksum);
 
-        businessLogicImp.loadReservationsIfChanged();
+        businessLogic.loadReservationsIfChanged();
 
         verify(reservationHelper, never()).fetchCSVData(anyString());
-    }
-
-    @Test
-    void testCalculateRevenue_ExceptionHandling() {
-        BusinessLogicImp.reservations = null;
-
-        assertThrows(ReservationException.class,
-                () -> businessLogicImp.calculateRevenue(YearMonth.of(2025, 5)));
-    }
-
-    @Test
-    void testCalculateUnreservedCapacity_ExceptionHandling() {
-        BusinessLogicImp.reservations = null;
-
-        assertThrows(ReservationException.class,
-                () -> businessLogicImp.calculateUnreservedCapacity(YearMonth.of(2025, 5)));
     }
 }
